@@ -19,61 +19,64 @@ jobs:
           name: Install Allure Commandline
           command: npm install -g allure-commandline
       - run:
-          name: Install Java
+          name: Install Java # Installs Java Development Kit, which is needed to run Java applications.
           command: |
-            apt-get update
+            apt-get update  # Updates the list of available packages and their versions.
             apt-get install -y openjdk-11-jdk
       - run:
-          name: Set JAVA_HOME
+          name: Set JAVA_HOME # Sets an environment variable JAVA_HOME that specifies the location of Java.
           command: echo 'export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64"' >> $BASH_ENV
       - run:
-          name: Update PATH
+          name: Update PATH # Updates the system PATH so the shell can find the Java binaries.
           command: echo 'export PATH="$JAVA_HOME/bin:$PATH"' >> $BASH_ENV
       - run:
           name: Install AWS CLI
           command: |
-            export DEBIAN_FRONTEND=noninteractive
-            ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
-            apt-get update
-            apt-get install -y awscli tzdata
-            dpkg-reconfigure --frontend noninteractive tzdata
+            export DEBIAN_FRONTEND=noninteractive  # Prevents the command line from asking for input.
+            ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime  # Sets the server's timezone.
+            apt-get update  # Refreshes the repository index.
+            apt-get install -y awscli tzdata  # Installs the AWS command line interface and timezone data.
+            dpkg-reconfigure --frontend noninteractive tzdata  # Reconfigures installed packages.
       - run:
           name: Configure AWS CLI
           command: |
-            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID  
+            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY  
             aws configure set default.region eu-central-1
       - run:
-          name: Define Timestamp
+          name: Define Timestamp # Creates a timestamp for when the job runs, useful for naming files or directories uniquely.
           command: echo 'export TIMESTAMP=$(date +%Y%m%d%H%M%S)' >> $BASH_ENV
       - run:
           name: Create Allure Results Directory
-          command: mkdir -p allure-results
+          command: mkdir -p allure-results # Creates a directory to store Allure test results.
       - run:
-          name: Download Allure History from S3
+          name: Download Allure History from S3 # Copies the Allure test history from an S3 bucket to the local machine.
           command: |
-            aws s3 cp s3://woytek-tutorial-bucket/allure-reports/latest/history ./allure-results/history --recursive
+            aws s3 cp s3://{{your-bucket-name}}/allure-reports/latest/history ./allure-results/history --recursive
       - run:
           name: Run Playwright Tests
           command: npm test
       - run:
-          name: Generate Allure Report with History
+          name: Generate Allure Report with History # Generates a visual report, with the clean option removing old data first.
           command: |
             allure generate allure-results --clean
       - run:
-          name: Upload New Allure Report to S3 with Timestamp
+          name: Upload New Allure Report to S3 with Timestamp # Creates a unique directory name for this build's report. / # Syncs the new report to your S3 bucket, making it publicly accessible.
           command: |
-            UNIQUE_REPORT_DIR="build-$(echo $CIRCLE_BUILD_NUM)-${TIMESTAMP}"
-            aws s3 sync ./allure-report s3://woytek-tutorial-bucket/allure-reports/$UNIQUE_REPORT_DIR --acl public-read
+            UNIQUE_REPORT_DIR="build-$(echo $CIRCLE_BUILD_NUM)-${TIMESTAMP}"  
+            aws s3 sync ./allure-report s3://{{your-bucket-name}}/allure-reports/$UNIQUE_REPORT_DIR --acl public-read
       - run:
-          name: Update Latest Report Reference with History
+          name: Update Latest Report Reference with History # Deletes the current 'latest' directory in your S3 bucket. / # Copies the new report and history data to the 'latest' directory. /
           command: |
-            aws s3 rm s3://woytek-tutorial-bucket/allure-reports/latest --recursive
-            aws s3 cp --recursive ./allure-report s3://woytek-tutorial-bucket/allure-reports/latest/
-            aws s3 cp --recursive ./allure-report/history s3://woytek-tutorial-bucket/allure-reports/latest/history/
+            aws s3 rm s3://{{your-bucket-name}}/allure-reports/latest --recursive  
+            aws s3 cp --recursive ./allure-report s3://{{your-bucket-name}}/allure-reports/latest/  
+            aws s3 cp --recursive ./allure-report/history s3://{{your-bucket-name}}/allure-reports/latest/history/
       - run:
-          name: Display Allure Report URL with Timestamp
-          command: echo "Allure report is available at https://woytek-tutorial-bucket.s3.eu-central-1.amazonaws.com/allure-reports/${UNIQUE_REPORT_DIR}/index.html"
+          name: Display Allure Report URL with Timestamp # Prints the URL where the report can be accessed.
+          command: echo "Allure report is available at https://{{your-bucket-name}}.s3.eu-central-1.amazonaws.com/allure-reports/${UNIQUE_REPORT_DIR}/index.html" > allure-report-url.txt
+      - store_artifacts:
+          path: allure-report-url.txt
+          destination: allure-report-url
 
 workflows:
   version: 2
